@@ -3,34 +3,76 @@ var FOCUS_COLOR = 'orange';
 var SELECT_COLOR = 'yellow';
 var CAMERA_POS = [5, 5, 0];
 //init global variables
-var scene = new THREE.Scene();
-var camera = new THREE.OrthographicCamera(window.innerWidth / -2, window.innerWidth / 2,
-    window.innerHeight / 2, window.innerHeight / -2, 1, 1000);
-
-var renderer = new THREE.WebGLRenderer();
-
-//add to html
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+var scene, controls, camera, renderer, light;
 var cube;
 //initialization
 function init() {
-    var geometry = new THREE.BoxGeometry( 100, 100, 100 );
-    var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-    cube = new THREE.Mesh( geometry, material );
-    scene.add(cube);
+    scene = new THREE.Scene();
+    //camera = new THREE.OrthographicCamera(window.innerWidth / -2, window.innerWidth / 2,
+    //    window.innerHeight / 2, window.innerHeight / -2, 1, 1000);
+    camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 5000 );
+    //renderer
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setClearColor(0xbbbbbb);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    //add to HTML
+    document.querySelector("#webgl-wrapper").appendChild(renderer.domElement);
 
-    camera.position.z = 100;
+    //controls
+    controls = new THREE.TrackballControls( camera );
+    controls.rotateSpeed = 1.0;
+    controls.zoomSpeed = 1.0;
+    controls.panSpeed = 0.8;
+    controls.noZoom = false;
+    controls.noPan = false;
+    controls.staticMoving = true;
+    controls.dynamicDampingFactor = 0.3;
+    controls.keys = [ 65, 83, 68 ];
+    controls.addEventListener( 'change', render );
+
+    // lights
+    light = new THREE.DirectionalLight( 0xffffff );
+    light.position.set( 500, 400, 500 );
+    scene.add( light );
+
+    //var geometry = new THREE.BoxGeometry(100, 100, 100);
+    var material = new THREE.MeshPhongMaterial( { color:0xffffff, shading: THREE.FlatShading } );
+    //cube = new THREE.Mesh(geometry, material);
+    //cube.matrixAutoUpdate = false;
+    //scene.add(cube);
+
+    //load
+
+    var loader = new THREE.JSONLoader();
+    loader.load('./3d/test.json', function(geometry) {
+        cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+        render();
+    });
+
+    camera.position.z = 500;
+
+    window.addEventListener( 'resize', onWindowResize, false );
 }
 
 function render() {
-    requestAnimationFrame( render );
-    cube.rotation.x += 0.1;
-    cube.rotation.y += 0.1;
-    renderer.render( scene, camera );
+    renderer.render(scene, camera);
 }
-
+// responsible for user input
+function animate() {
+    requestAnimationFrame( animate );
+    controls.update();
+}
 //UTILITIES
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    controls.handleResize();
+
+    render();
+}
 function loadModels() {
     //read json and load 3d models
 }
@@ -48,11 +90,11 @@ function resetCamera() {
 
 //DESCRIPTIONS
 function setShipDescription() {
-    
+
 }
 
 function setPartDescription() {
-    
+
 }
 
 function setLevelDescription() {
@@ -78,4 +120,5 @@ function focusPart(part) {
 }
 //STARTING LOOP
 init();
-render();
+//render();
+animate();
