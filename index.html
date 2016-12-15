@@ -8,15 +8,20 @@
 </head>
 <body>
 <div id="webgl-wrapper"></div>
-<div id="ship-search">
-    <input placeholder="Поиск" type="text">
-</div>
 <div id="top-menu">
+    <div id="level"></div>
     <button>Вид сбоку</button>
     <button>Вид сверху</button>
+    <button onclick="resetData()">Сбросить</button>
+</div>
+<div id="info">
+    <h3 style="color: #455e5f">Информация</h3>
+    <h4 id="info-name"></h4>
+    <p id="info-description"></p>
 </div>
 <script src="js/three.js"></script>
 <script src="js/TrackballControls.js"></script>
+<script src="data.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
