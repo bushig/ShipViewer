@@ -1,11 +1,11 @@
 "use strict";
-//CONSTANTS
-var FOCUS_COLOR = 'orange';
-var SELECT_COLOR = 'yellow';
-var CAMERA_POS = [5, 5, 0];
 //init global variables
-var scene, controls, camera, renderer, light;
-var material;
+var CAMERA_RADIUS = 100;
+var scene, controls, camera, renderer, raycaster;
+var INTERSECTED;
+var currLevel, focus;
+var material, light;
+var mouse = new THREE.Vector2();
 var DATA;
 //initialization
 function init() {
@@ -14,7 +14,7 @@ function init() {
     //    window.innerHeight / 2, window.innerHeight / -2, 1, 1000);
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
     //renderer
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0xbbbbbb);
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -22,16 +22,13 @@ function init() {
     document.querySelector("#webgl-wrapper").appendChild(renderer.domElement);
 
     //controls
-    controls = new THREE.TrackballControls(camera);
-    controls.rotateSpeed = 1.0;
-    controls.zoomSpeed = 1.0;
-    controls.panSpeed = 1.0;
-    controls.noZoom = false;
-    controls.noPan = false;
-    controls.staticMoving = true;
-    controls.dynamicDampingFactor = 0.3;
-    controls.keys = [65, 83, 68];
-    controls.addEventListener('change', render);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.rotateSpeed = 0.4;
+    controls.enablePan = false;
+    controls.mouseButtons = { ORBIT: THREE.MOUSE.RIGHT, ZOOM: THREE.MOUSE.MIDDLE};
+    //controls.enableDamping = true;
+    //controls.dampingFactor = 0.25;
+    //controls.addEventListener('change', render);
 
     // lights
     scene.add(new THREE.AmbientLight(0xcccccc, 0.5));
@@ -47,15 +44,16 @@ function init() {
 
     loadModels();
 
+    raycaster = new THREE.Raycaster();
+
     //
     // loader.load('./3d/test.json', function(geometry) {
     //     cube = new THREE.Mesh(geometry, material);
     //     scene.add(cube);
     //     render();
     // });
-
-    camera.position.z = 500;
-
+    document.addEventListener('mousemove', onDocumentMouseMove, false);
+    document.addEventListener('click', selectPart);
     window.addEventListener('resize', onWindowResize, false);
 }
 
@@ -65,31 +63,46 @@ function render() {
 // responsible for user input
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    checkIntersections();
+    render();
+    //controls.update();
 }
 //UTILITIES
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    controls.handleResize();
-
     render();
+}
+function onDocumentMouseMove(event) {
+    event.preventDefault();
+    mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    mouse.y = -( event.clientY / window.innerHeight ) * 2 + 1;
 }
 function loadModels() {
     //read json and load 3d models
     //TODO: Maybe make it async and remove double for loop
-    var parts = SHIP_DATA.shipParts;
-    var loader = new THREE.JSONLoader();
-    for (var level = 0; level < parts.length; level++) {
-        var levelParts = parts[level];
-        for (var i = 0; i < levelParts.length; i++) {
-            var part = levelParts[i];
+    let parts = SHIP_DATA.shipParts;
+    let loader = new THREE.JSONLoader();
+    for (let level = 0; level < parts.length; level++) {
+        let levelParts = parts[level];
+        for (let i = 0; i < levelParts.length; i++) {
+            let part = levelParts[i];
 
-            loader.load('./3d/' + part.model, function (geometry) {
+            loader.load('./3d/' + part.model, function (geometry, materials) {
+                //TODO: Fix to use all materials, not just first
+                var material = new THREE.MultiMaterial( materials );
                 var model = new THREE.Mesh(geometry, material);
+                model.matrixAutoUpdate = false;
+                //user data
+                model.userData.level = level;
+                //model.userData.color = model.currentHex;
+                model.userData.name = part.name;
+                model.userData.description = part.description;
+
                 scene.add(model);
-                render();
+                //console.log(level, i);
+                SHIP_DATA.shipParts[level][i].id = model.id;
             });
 
         }
@@ -99,6 +112,7 @@ function loadModels() {
 }
 //Sets ship info, levels, camera position etc
 function resetData() {
+    //TODO: rename to resetAll or smth and refactor to utilize control's reset
     var name = SHIP_DATA.shipName;
     var description = SHIP_DATA.shipDescription;
 
@@ -106,27 +120,63 @@ function resetData() {
     document.getElementById('info-description').innerText = description;
     document.getElementById('level').innerText = "Выберите уровень";
 
-    camera.position.z = 100;
+    camera.position.set(0, 0, CAMERA_RADIUS);
+    camera.lookAt( scene.position );
+    currLevel = null;
+    focus = null;
+    render();
+}
+
+function checkIntersections() {
+    //TODO: Refactor
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(mouse, camera);
+    var intersects = raycaster.intersectObjects(scene.children);
+    if (intersects.length > 0) {
+        if (INTERSECTED !== intersects[0].object) {
+            //if was intersected, set intersected color back to normal
+            if (INTERSECTED) {
+                highlightPartLevel(INTERSECTED, 0x000000);
+                //INTERSECTED.material.emissive.setHex(INTERSECTED.currentHex);
+            }
+            INTERSECTED = intersects[0].object;
+
+            // highlight only if there is currently selected level
+            if (currLevel !== null) {
+                highlightPart(INTERSECTED, 0xff0000);
+            } else {
+                highlightPartLevel(INTERSECTED, 0xff0000);
+            }
+        }
+    } else {
+        if (INTERSECTED) {
+            //console.log(INTERSECTED);
+            //INTERSECTED.material.emissive.setHex(INTERSECTED.userData.color);
+            highlightPartLevel(INTERSECTED, 0x000000);
+        }
+        INTERSECTED = null;
+    }
 }
 function setCameraTop() {
     //set to topdown view
+    camera.position.set(0.00, CAMERA_RADIUS, 0.00);
+    controls.update();
 }
 
 function setCameraSide() {
     //while camera not 90 degrees, move it etc
-}
-
-function resetCamera() {
-    //drop camera focus, set default ship description
+    camera.position.set(0.00, 0.0, CAMERA_RADIUS);
+    controls.update();
 }
 
 //DESCRIPTIONS
-function setShipDescription() {
-
+function setPartDescription() {
+    document.getElementById("info-name").innerText = INTERSECTED.userData.name;
+    document.getElementById("info-description").innerText = INTERSECTED.userData.description;
 }
 
-function setPartDescription() {
-
+function setLevelInfo(level) {
+    document.getElementById('level').innerText = "Уровень: "+level;
 }
 
 function setLevelDescription() {
@@ -135,11 +185,26 @@ function setLevelDescription() {
 
 
 //MODEL HIGHLIGHTS
-function setLevelColor(part) {
+function highlightPartLevel(part, color) {
     //to select color
+    let level = part.userData.level;
+    let levelParts = SHIP_DATA.shipParts[level];
+    for(var i = 0; i<levelParts.length; i++){
+        let part = levelParts[i];
+        let object = scene.getObjectById(part.id);
+        highlightPart(object, color);
+    }
+
 }
-function setPartColor(part) {
-    //to focus color
+function highlightPart(part, color) {
+    //part.currentHex = INTERSECTED.material.emissive.getHex();
+    let materials = part.material.materials;
+    for(let i = 0; i<materials.length; i++){
+        let mat = materials[i];
+        mat.emissive.setHex(color);
+    }
+    //part.material.emissive.setHex(color);
+
 }
 
 //MAIN CONTROLS
@@ -147,8 +212,16 @@ function searchPart() {
     //set currently selected parts to empty list
     //get current search text, loop through models and if they ok add them to selectHighlighted
 }
-function focusPart(part) {
+function selectPart(part) {
     //set focus to detail, set its description
+    if(INTERSECTED){
+        if(currLevel!== null){
+            setPartDescription();
+        } else {
+            currLevel = INTERSECTED.userData.level;
+            setLevelInfo(currLevel);
+        }
+    }
 }
 //STARTING LOOP
 init();
