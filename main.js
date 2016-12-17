@@ -8,6 +8,11 @@ var material, light;
 var MODELS_AVAILABLE = false; //true if models inited
 var mouse = new THREE.Vector2();
 var DATA;
+function createCube(x,y,z) {
+    var cube = new THREE.Mesh( new THREE.CubeGeometry( 1, 1, 1 ), material);
+    cube.position.set(x,y,z);
+    scene.add(cube);
+}
 //initialization
 function init() {
     scene = new THREE.Scene();
@@ -44,7 +49,7 @@ function init() {
     //controls.addEventListener('change', render);
 
     // lights
-    scene.add(new THREE.AmbientLight(0xcccccc, 0.5));
+    scene.add(new THREE.AmbientLight(0xcccccc, 0.6));
     light = new THREE.DirectionalLight(0xbbbbbb, 0.7);
     light.position.set(30, 10, 20);
     scene.add(light);
@@ -197,13 +202,25 @@ function checkIntersections() {
 }
 function setCameraTop() {
     //set to topdown view
-    camera.position.set(0.00, CAMERA_RADIUS, 0.00);
+    var tx,ty,tz;
+    if(FOCUS){
+        tx = FOCUS.userData.tx;
+        ty = FOCUS.userData.ty;
+        tz = FOCUS.userData.tz;
+    }
+    camera.position.set(tx || 0.00, CAMERA_RADIUS, tz || 0.00);
     controls.update();
 }
 
 function setCameraSide() {
     //while camera not 90 degrees, move it etc
-    camera.position.set(0.00, 0.0, CAMERA_RADIUS);
+    var tx,ty,tz;
+    if(FOCUS){
+        tx = FOCUS.userData.tx;
+        ty = FOCUS.userData.ty;
+        tz = FOCUS.userData.tz;
+    }
+    camera.position.set(tx||0.0, ty||0.0, CAMERA_RADIUS);
     controls.update();
 }
 
@@ -267,12 +284,10 @@ function setTarget(object) {
     var x = object.position.x;
     var y = object.position.y;
     var z = object.position.z;
-
-    if (tx && ty && tz){
-        controls.target.set(tx, ty, tz);
-    } else{
-        controls.target.set(x, y, z);
-    }
+    // console.log(tx, ty, tz);
+    // //TODO: not very safe to use it
+    controls.target.set(tx||x, ty||y, tz||z);
+    // setCameraSide();
     controls.update()
 }
 function setVisibilityLevel(desiredLevel) {
@@ -320,6 +335,7 @@ function selectPart(part) {
         if(currLevel !== null){
             resetLevel();
             resetFOCUS();
+            setTarget(scene);
             setVisibilityLevel(SHIP_DATA.shipParts.length);
         }
     }
