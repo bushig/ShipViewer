@@ -9,9 +9,9 @@
 <body>
 <div id="webgl-wrapper"></div>
 <div id="top-menu">
-    <button onclick="setCameraSide()">Вид сбоку</button>
-    <button onclick="setCameraTop()">Вид сверху</button>
-    <button onclick="resetData()">Сбросить</button>
+    <button onclick="var event = arguments[0];event.stopPropagation();setCameraSide()">Вид сбоку</button>
+    <button onclick="var event = arguments[0];event.stopPropagation();setCameraTop()">Вид сверху</button>
+    <button onclick="var event = arguments[0];event.stopPropagation();resetData()">Сбросить</button>
     <div id="level"></div>
 </div>
 <div id="info">
